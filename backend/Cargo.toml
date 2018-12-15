@@ -1,0 +1,12 @@
+[package]
+name = "backend"
+version = "0.1.0"
+authors = ["rileylyman <rileylyman@berkeley.edu>"]
+
+[dependencies]
+rocket = "0.4.0"
+chrono = "0.4.6"
+
+[dependencies.rusqlite]
+version = "0.15.0"
+features = ["bundled"]
