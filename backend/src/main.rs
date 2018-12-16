@@ -22,7 +22,11 @@ struct RockPost {
 
 #[derive(Serialize, Deserialize)]
 struct RockData {
+    trip: u32,
     time_logged: String,
+    day_logged: u32,
+    month_logged: u32,
+    year_logged: u32,
     hour: u32,
     minute: u32,
     fixquality: u32,
@@ -45,9 +49,10 @@ impl std::fmt::Display for RockData {
                     Longitude: {}\n 
                     Latitude: {}\n 
                     Altitude: {}\n 
-                    Temperature: {}",
+                    Temperature: {}\n
+                    Trip number {}",
                 self.time_logged, self.hour, self.minute, self.fixquality, self.speed, 
-                self.angle, self.lon, self.lat, self.altitude, self.temp
+                self.angle, self.lon, self.lat, self.altitude, self.temp, self.trip
         )
     }
 }
@@ -55,12 +60,12 @@ impl std::fmt::Display for RockData {
 #[post("/log", data = "<data>")]
 fn log(conn: rocket::State<DbConn>, data: rocket::request::Form<RockPost>) -> JsonValue {
     
-    //TODO: check packed string values
+    //TODO: Split up log time
 
     if data.auth != secrets::AUTH_STRING { 
         return json!({
             "status":"error", 
-            "reason":"Authentication did not match."
+            "reason":"Invalid authentication."
         }); 
     }
 
@@ -68,29 +73,54 @@ fn log(conn: rocket::State<DbConn>, data: rocket::request::Form<RockPost>) -> Js
         .split(':')
         .collect();
 
-    if components.len() != 9 {
+    if components.len() != 10 {
         return json!({
             "status": "error",
-            "reason": "Invalid packed-data format."
+            "reason": "Packed string contains an unexpected number of values."
         })
+    }
+
+    let mut trip: u32 = 0;
+    let mut hour: u32 = 0;
+    let mut minute: u32 = 0;
+    let mut fixquality: u32 = 0;
+    let mut speed: f64 = 0.0;
+    let mut angle: f64 = 0.0;
+    let mut lon: f64 = 0.0;
+    let mut lat: f64 = 0.0;
+    let mut altitude: f64 = 0.0;
+    let mut temp: f64 = 0.0;
+
+    if let Err(_) = try_parse_packed(&components, &mut trip,       &mut hour,     &mut minute,   
+                                                  &mut fixquality, &mut speed,    &mut angle,    
+                                                  &mut lon,        &mut lat,      &mut altitude, 
+                                                  &mut temp) 
+    { 
+        return json!({
+            "status": "error",
+            "reason": "Could not parse input string."
+        });
     }
 
     match conn.lock()
         .unwrap()
         .execute(
         "insert into updates 
-            (time_logged, hour, minute, fixquality, speed, angle, lon, lat, altitude, temp)
+            (trip, time_logged, day_logged, month_logged, year_logged,
+             hour, minute, fixquality, speed, angle, lon, lat, altitude, temp)
          values
-            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
 
-        &[  &fnow(),
-            components[0], components[1], components[2],
-            components[3], components[4], components[5],
-            components[6], components[7], components[8] 
-        ]) 
-    {
+        &[  &trip.to_string(), &fnow(TimeType::All), &fnow(TimeType::Day), 
+            &fnow(TimeType::Month), &fnow(TimeType::Year), 
+            &hour.to_string(),  &minute.to_string(),   &fixquality.to_string(),
+            &speed.to_string(), &angle.to_string(),    &lon.to_string(),
+            &lat.to_string(),   &altitude.to_string(), &temp.to_string() 
+        ]
+    )   {
         Ok(_) => json!({
-            "status":"ok"
+            "status": "ok",
+            "message": "have a nice day"
         }),
         Err(e) => json!({
             "status":"error",
@@ -111,18 +141,24 @@ fn get(conn: rocket::State<DbConn>) -> Json<Option<Vec<RockData>>> {
     while let Some(maybe_row) = rows.next() 
     {
         let row = maybe_row.expect("get next row");
-        all_data.push(RockData {
-            time_logged: row.get(0),
-            hour: row.get(1),
-            minute: row.get(2),
-            fixquality: row.get(3),
-            speed: row.get(4),
-            angle: row.get(5),
-            lon: row.get(6),
-            lat: row.get(7),
-            altitude: row.get(8),
-            temp: row.get(9),
-        });  
+        all_data.push(
+            RockData {
+                trip:         row.get(0),
+                time_logged:  row.get(1),
+                day_logged:   row.get(2),
+                month_logged: row.get(3),
+                year_logged:  row.get(4),
+                hour:         row.get(5),
+                minute:       row.get(6),
+                fixquality:   row.get(7),
+                speed:        row.get(8),
+                angle:        row.get(9),
+                lon:          row.get(10),
+                lat:          row.get(11),
+                altitude:     row.get(12),
+                temp:         row.get(13),
+            }
+        );  
     }
 
     if all_data.len() > 0 {
@@ -147,7 +183,11 @@ fn main() -> () {
         .expect("Failed to create sqlite");
 
     match conn.execute("create table updates (
+                            trip INTEGER,
                             time_logged TEXT,
+                            day_logged INTEGER,
+                            month_logged INTEGER,
+                            year_logged INTEGER,
                             hour INTEGER,
                             minute INTEGER,
                             fixquality INTEGER, 
@@ -165,8 +205,42 @@ fn main() -> () {
         .launch();
 }
 
-fn fnow() -> String {
+enum TimeType {
+    All, Day, Month, Year
+}
+
+fn fnow(t: TimeType) -> String {
     let now = std::time::SystemTime::now();
     let datetime: chrono::DateTime<chrono::offset::Utc> = now.into();
-    format!("{}", datetime.format("%d/%m/%Y %T"))
+    let mut fstr = String::new();
+    match t {
+        TimeType::All => fstr.push_str("%d/%m/%Y %T"),
+        TimeType::Day => fstr.push_str("%d"),
+        TimeType::Month => fstr.push_str("%m"),
+        TimeType::Year => fstr.push_str("%Y")
+    }
+    format!("{}", datetime.format(&fstr))
+}
+
+fn try_parse_packed(components: &Vec<&str>, trip: &mut u32, hour: &mut u32, minute: &mut u32, fixquality: &mut u32,
+            speed: &mut f64, angle: &mut f64, lon: &mut f64, lat: &mut f64, altitude: &mut f64, temp: &mut f64) -> Result<(), ()> 
+{
+    if let ( Ok(_trip), Ok(_hour),  Ok(_minute),   Ok(_fixquality),
+             Ok(_speed), Ok(_angle),    Ok(_lon),
+             Ok(_lat),   Ok(_altitude), Ok(_temp)) = 
+           ( components[0].parse::<u32>(), components[1].parse::<u32>(),
+             components[2].parse::<u32>(), components[3].parse::<u32>(),
+             components[4].parse::<f64>(), components[5].parse::<f64>(),
+             components[6].parse::<f64>(), components[7].parse::<f64>(), 
+             components[8].parse::<f64>(), components[9].parse::<f64>(),) 
+    {
+        *hour  = _hour;  *minute   = _minute;   *fixquality = _fixquality;
+        *speed = _speed; *angle    = _angle;    *lon        = _lon;
+        *lat   = _lat;   *altitude = _altitude; *temp       = _temp;
+        *trip  = _trip;
+        Ok(())
+    } 
+    else {
+        Err(())
+    } 
 }
