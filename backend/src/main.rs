@@ -60,7 +60,7 @@ impl std::fmt::Display for RockData {
 #[post("/log", data = "<data>")]
 fn log(conn: rocket::State<DbConn>, data: rocket::request::Form<RockPost>) -> JsonValue {
     
-    //TODO: Split up log time
+    //TODO: Transform into degree lon/lat
 
     if data.auth != secrets::AUTH_STRING { 
         return json!({
@@ -129,12 +129,12 @@ fn log(conn: rocket::State<DbConn>, data: rocket::request::Form<RockPost>) -> Js
     }
 }
 
-#[get("/")]
-fn get(conn: rocket::State<DbConn>) -> Json<Option<Vec<RockData>>> {
+#[get("/<trip>")]
+fn get(conn: rocket::State<DbConn>, trip: u32) -> Json<Option<Vec<RockData>>> {
   
     let lock = conn.lock().expect("acquire lock");
-    let mut statement = lock.prepare("select * from updates").expect("select rows from db");
-    let mut rows = statement.query(&[]: &[i32;0]).expect("execute db query");
+    let mut statement = lock.prepare("select * from updates where trip = ?").expect("select rows from db");
+    let mut rows = statement.query(&[trip]).expect("execute db query");
     
     let mut all_data: Vec<RockData> = Vec::new();
 
@@ -182,22 +182,27 @@ fn main() -> () {
         ::open(std::path::Path::new("./target/test_db.db"))
         .expect("Failed to create sqlite");
 
-    match conn.execute("create table updates (
-                            trip INTEGER,
-                            time_logged TEXT,
-                            day_logged INTEGER,
-                            month_logged INTEGER,
-                            year_logged INTEGER,
-                            hour INTEGER,
-                            minute INTEGER,
-                            fixquality INTEGER, 
-                            speed REAL, 
-                            angle REAL, 
-                            lon REAL, 
-                            lat REAL, 
-                            altitude REAL, 
-                            temp REAL
-                        )", &[]: &[i32;0]) { _ => {} }
+    if let Err(_) = conn.execute(
+        "create table updates (
+            trip INTEGER,
+            time_logged TEXT,
+            day_logged INTEGER,
+            month_logged INTEGER,
+            year_logged INTEGER,
+            hour INTEGER,
+            minute INTEGER,
+            fixquality INTEGER, 
+            speed REAL, 
+            angle REAL, 
+            lon REAL, 
+            lat REAL, 
+            altitude REAL, 
+            temp REAL
+        )",
+         &[]: &[i32;0]) 
+    { 
+        println!("Table updates already created."); 
+    }
 
     rocket::ignite()
         .manage(Mutex::new(conn))
