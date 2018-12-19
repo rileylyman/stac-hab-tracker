@@ -1,0 +1,9 @@
+<div class="container">
+  <div class="col">
+    <h2>Updates History</h2>
+    <li *ngFor="let update of updates$">
+      <h3>Update Sent at {{update.hour}}:{{update.minute}}</h3>
+      Location reported: ({{update.lon}}, {{update.lat}})
+    </li>
+  </div>
+</div>
