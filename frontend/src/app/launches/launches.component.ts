@@ -19,9 +19,10 @@ export class LaunchesComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.data.getUpdates(this.trip$).subscribe(
-      data => this.updates$ = data
-    );
+    //this.data.getUpdates(this.trip$).subscribe(
+    //  data => this.updates$ = data
+    //);
+    this.updates$ = [];
   }
 
 }

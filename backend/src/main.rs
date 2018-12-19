@@ -22,20 +22,20 @@ struct RockPost {
 
 #[derive(Serialize, Deserialize)]
 struct RockData {
-    trip: u32,
-    time_logged: String,
-    day_logged: u32,
-    month_logged: u32,
-    year_logged: u32,
-    hour: u32,
-    minute: u32,
-    fixquality: u32,
-    speed: f64,
-    angle: f64,
-    lon: f64,
-    lat: f64,
-    altitude: f64,
-    temp: f64,
+        trip: u32,
+        time_logged: String,
+        day_logged: u32,
+        month_logged: u32,
+        year_logged: u32,
+        hour: u32,
+        minute: u32,
+        fixquality: u32,
+        speed: f64,
+        angle: f64,
+        lon: f64,
+        lat: f64,
+        altitude: f64,
+        temp: f64,
 }
 
 impl std::fmt::Display for RockData {
