@@ -12,5 +12,6 @@ serde_json = "1.0.33"
 serde = "1.0.82"
 
 [dependencies.rusqlite]
-version = "0.15.0"
+version = "0.16.0"
 features = ["bundled"]
+

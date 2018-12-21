@@ -12,7 +12,14 @@ mod secrets;
 use std::sync::Mutex;
 use rocket_contrib::json::{ Json, JsonValue };
 
+const MAIN_DB: &'static str = "./db/main.db";
+const BACKUP_DB: &'static str = "./db/backup.db";
+
 type DbConn = Mutex<rusqlite::Connection>;
+
+enum TimeType {
+    All, Day, Month, Year
+}
 
 #[derive(FromForm)]
 struct RockPost {
@@ -38,23 +45,17 @@ struct RockData {
         temp: f64,
 }
 
-impl std::fmt::Display for RockData {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-                f, "Received: {}\n 
-                    Sent: {}:{}\n 
-                    Fix: {}\n 
-                    Speed: {}\n 
-                    Angle: {}\n
-                    Longitude: {}\n 
-                    Latitude: {}\n 
-                    Altitude: {}\n 
-                    Temperature: {}\n
-                    Trip number {}",
-                self.time_logged, self.hour, self.minute, self.fixquality, self.speed, 
-                self.angle, self.lon, self.lat, self.altitude, self.temp, self.trip
-        )
-    }
+#[post("/backup?<auth_string>")]
+fn do_backup(conn: rocket::State<DbConn>, auth_string: String) -> JsonValue {
+    //Backup the database now...
+    let main_connection = conn.lock().unwrap();
+    let backup_connection = rusqlite::Connection::open(std::path::Path::new(BACKUP_DB)).unwrap();
+    let _ = rusqlite::ErrorCode::PermissionDenied;
+    let backup = rusqlite::backup::Backup::new(main_connection, &mut backup_connection).unwrap();
+    backup.run_to_completion(5, std::time::Duration::from_millis(250), None);
+    json!({
+        "status": "ok"
+    })
 }
 
 #[post("/log", data = "<data>")]
@@ -134,7 +135,7 @@ fn get(conn: rocket::State<DbConn>, trip: u32) -> Json<Option<Vec<RockData>>> {
   
     let lock = conn.lock().expect("acquire lock");
     let mut statement = lock.prepare("select * from updates where trip = ?").expect("select rows from db");
-    let mut rows = statement.query(&[trip]).expect("execute db query");
+    let mut rows = statement.query(&[trip]: &[u32;1]).expect("execute db query");
     
     let mut all_data: Vec<RockData> = Vec::new();
 
@@ -179,9 +180,24 @@ fn not_found() -> JsonValue {
 fn main() -> () {
 
     let conn = rusqlite::Connection
-        ::open(std::path::Path::new("./target/test_db.db"))
-        .expect("Failed to create sqlite");
+        ::open(std::path::Path::new(MAIN_DB))
+        .expect("create main connection");
 
+    init_db(&conn);
+
+    let backup_conn = rusqlite::Connection
+        ::open(std::path::Path::new(BACKUP_DB))
+        .expect("create backup connection");
+
+    init_db(&backup_conn);
+
+    rocket::ignite()
+        .manage(Mutex::new(conn))
+        .mount("/", routes![get, log, do_backup])
+        .launch();
+}
+
+fn init_db(conn: &rusqlite::Connection) {
     if let Err(_) = conn.execute(
         "create table updates (
             trip INTEGER,
@@ -203,15 +219,6 @@ fn main() -> () {
     { 
         println!("Table updates already created."); 
     }
-
-    rocket::ignite()
-        .manage(Mutex::new(conn))
-        .mount("/", routes![get, log])
-        .launch();
-}
-
-enum TimeType {
-    All, Day, Month, Year
 }
 
 fn fnow(t: TimeType) -> String {
