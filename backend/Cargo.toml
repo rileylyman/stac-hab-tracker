@@ -13,5 +13,5 @@ serde = "1.0.82"
 
 [dependencies.rusqlite]
 version = "0.16.0"
-features = ["bundled"]
+features = ["bundled", "backup"]
 

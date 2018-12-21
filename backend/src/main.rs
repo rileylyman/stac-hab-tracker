@@ -47,12 +47,19 @@ struct RockData {
 
 #[post("/backup?<auth_string>")]
 fn do_backup(conn: rocket::State<DbConn>, auth_string: String) -> JsonValue {
+    
+    if auth_string != secrets::AUTH_STRING { 
+        return json!({
+            "status":"error", 
+            "reason":"Invalid authentication."
+        }); 
+    }
+    
     //Backup the database now...
-    let main_connection = conn.lock().unwrap();
-    let backup_connection = rusqlite::Connection::open(std::path::Path::new(BACKUP_DB)).unwrap();
-    let _ = rusqlite::ErrorCode::PermissionDenied;
+    let main_connection: &rusqlite::Connection = &*conn.lock().unwrap();
+    let mut backup_connection = rusqlite::Connection::open(std::path::Path::new(BACKUP_DB)).unwrap();
     let backup = rusqlite::backup::Backup::new(main_connection, &mut backup_connection).unwrap();
-    backup.run_to_completion(5, std::time::Duration::from_millis(250), None);
+    backup.run_to_completion(5, std::time::Duration::from_millis(250), None).unwrap();
     json!({
         "status": "ok"
     })
