@@ -24,13 +24,11 @@ export interface HABUpdate {
 })
 export class HabdataService {
 
-  url: string = 'https://jsonplaceholder.typicode.com/todos';
+  url: string = 'http://localhost:8000/';
 
   constructor(private http: HttpClient) { }
 
-  getUpdates(trip: number) {
-    this.http.get<any>(this.url).subscribe(
-      data => console.log(data)
-    );
+  getUpdates(trip: number): Observable<HABUpdate[]> {
+    return this.http.get<HABUpdate[]>(this.url + String(trip));
   } 
 }
