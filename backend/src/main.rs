@@ -4,6 +4,7 @@
 #[macro_use] extern crate serde_derive;
 extern crate rusqlite;
 extern crate chrono;
+extern crate hex;
 #[macro_use] extern crate rocket_contrib;
 
 #[cfg(test)] mod tests;
@@ -21,6 +22,8 @@ enum TimeType {
     All, Day, Month, Year
 }
 
+struct DecodedData(Vec<String>);
+
 #[derive(FromForm)]
 struct RockPost {
     imei: u32,
@@ -29,7 +32,31 @@ struct RockPost {
     iridium_latitude: f64,
     iridium_longitude: f64,
     iridium_cep: u32,
-    data: String
+    data: DecodedData,
+}
+
+impl<'v> rocket::request::FromFormValue<'v> for DecodedData {
+    type Error = &'static str;
+
+    fn from_form_value(raw: &'v rocket::http::RawStr) -> Result<Self, Self::Error> {
+        let hex_rep = raw.as_str();
+        if let Ok(bytes) = hex::decode(hex_rep) {
+            if let Ok(packed_str) = std::str::from_utf8(&bytes) {
+                
+                let mut components: Vec<String> = Vec::new();
+                for element in packed_str.split(':') {
+                    components.push(String::from(element));
+                }
+                if components.len() == 10 {
+                    return Ok(DecodedData(components));
+                } else {
+                    return Err("Packed string misformatted: too many elements.")
+                }
+            }
+        }
+        Err("Could not decode hex string.")
+        
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -82,17 +109,6 @@ fn log(conn: rocket::State<DbConn>, rock_data: rocket::request::Form<RockPost>, 
         }); 
     }
 
-    let components: Vec<&str> = rock_data.data
-        .split(':')
-        .collect();
-
-    if components.len() != 10 {
-        return json!({
-            "status": "error",
-            "reason": "Packed string contains an unexpected number of values."
-        })
-    }
-
     let mut trip: u32 = 0;
     let mut hour: u32 = 0;
     let mut minute: u32 = 0;
@@ -104,10 +120,10 @@ fn log(conn: rocket::State<DbConn>, rock_data: rocket::request::Form<RockPost>, 
     let mut altitude: f64 = 0.0;
     let mut temp: f64 = 0.0;
 
-    if let Err(_) = try_parse_packed(&components, &mut trip,       &mut hour,     &mut minute,   
-                                                  &mut fixquality, &mut speed,    &mut angle,    
-                                                  &mut lon,        &mut lat,      &mut altitude, 
-                                                  &mut temp) 
+    if let Err(_) = try_parse_packed(&rock_data.data.0, &mut trip,       &mut hour,     &mut minute,   
+                                                        &mut fixquality, &mut speed,    &mut angle,    
+                                                        &mut lon,        &mut lat,      &mut altitude, 
+                                                        &mut temp) 
     { 
         return json!({
             "status": "error",
@@ -246,7 +262,7 @@ fn fnow(t: TimeType) -> String {
     format!("{}", datetime.format(&fstr))
 }
 
-fn try_parse_packed(components: &Vec<&str>, trip: &mut u32, hour: &mut u32, minute: &mut u32, fixquality: &mut u32,
+fn try_parse_packed(components: &Vec<String>, trip: &mut u32, hour: &mut u32, minute: &mut u32, fixquality: &mut u32,
             speed: &mut f64, angle: &mut f64, lon: &mut f64, lat: &mut f64, altitude: &mut f64, temp: &mut f64) -> Result<(), ()> 
 {
     if let ( Ok(_trip), Ok(_hour),  Ok(_minute),   Ok(_fixquality),
