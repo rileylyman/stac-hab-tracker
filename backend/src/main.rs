@@ -27,12 +27,15 @@ struct DecodedData(Vec<String>);
 #[derive(FromForm)]
 #[allow(dead_code)]
 struct RockPost {
+    device_type: String,
+    serial: i32,
     imei: u64,
     momsn: u32,
     transmit_time: String,
     iridium_latitude: f64,
     iridium_longitude: f64,
     iridium_cep: f64,
+    iridium_session_status: i32,
     data: DecodedData,
 }
 
