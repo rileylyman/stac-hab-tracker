@@ -33,6 +33,7 @@ struct RockPost {
     iridium_latitude: f64,
     iridium_longitude: f64,
     iridium_cep: u32,
+    iridium_session_status: u32,
     data: DecodedData,
 }
 
