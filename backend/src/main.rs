@@ -25,6 +25,7 @@ enum TimeType {
 struct DecodedData(Vec<String>);
 
 #[derive(FromForm)]
+#[allow(dead_code)]
 struct RockPost {
     imei: u32,
     momsn: u32,
@@ -101,6 +102,7 @@ fn do_backup(conn: rocket::State<DbConn>, auth_string: String) -> JsonValue {
 fn log(conn: rocket::State<DbConn>, rock_data: rocket::request::Form<RockPost>, auth_string: String) -> JsonValue {
     
     //TODO: Transform into degree lon/lat
+    //TODO: Check if fix is 0, if so, use iridum coords
 
     if auth_string != secrets::AUTH_STRING { 
         return json!({
