@@ -23,8 +23,13 @@ enum TimeType {
 
 #[derive(FromForm)]
 struct RockPost {
-    packed_string: String,
-    auth: String
+    imei: u32,
+    momsn: u32,
+    transmit_time: String,
+    iridium_latitude: f64,
+    iridium_longitude: f64,
+    iridium_cep: u32,
+    data: String
 }
 
 #[derive(Serialize, Deserialize)]
@@ -65,19 +70,19 @@ fn do_backup(conn: rocket::State<DbConn>, auth_string: String) -> JsonValue {
     })
 }
 
-#[post("/log", data = "<data>")]
-fn log(conn: rocket::State<DbConn>, data: rocket::request::Form<RockPost>) -> JsonValue {
+#[post("/log?<auth_string>", data = "<rock_data>")]
+fn log(conn: rocket::State<DbConn>, rock_data: rocket::request::Form<RockPost>, auth_string: String) -> JsonValue {
     
     //TODO: Transform into degree lon/lat
 
-    if data.auth != secrets::AUTH_STRING { 
+    if auth_string != secrets::AUTH_STRING { 
         return json!({
             "status":"error", 
             "reason":"Invalid authentication."
         }); 
     }
 
-    let components: Vec<&str> = data.packed_string
+    let components: Vec<&str> = rock_data.data
         .split(':')
         .collect();
 
