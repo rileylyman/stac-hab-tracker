@@ -24,11 +24,13 @@ export interface HABUpdate {
 })
 export class HabdataService {
 
-  url: string = 'http://localhost:8000/';
+  url: string = 'http://api.stachab.org/';
 
   constructor(private http: HttpClient) { }
 
   getUpdates(trip: number): Observable<HABUpdate[]> {
-    return this.http.get<HABUpdate[]>(this.url + String(trip));
+    let updates = this.http.get<HABUpdate[]>(this.url + String(trip));
+    
+    return updates;
   } 
 }

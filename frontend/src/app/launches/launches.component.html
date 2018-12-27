@@ -1,9 +1,20 @@
 <div class="container">
-  <div class="col">
-    <h2>Updates History</h2>
-    <li *ngFor="let update of updates$">
-      <h3>Update Sent at {{update.hour}}:{{update.minute}}</h3>
-      Location reported: ({{update.lon}}, {{update.lat}})
-    </li>
+  <div class="row">
+    <div class="col-md-10">
+      <h1>Trip {{trip$}}</h1>
+      <agm-map [latitude]="updates$[0].lat" [longitude]="updates$[0].lon">
+        <agm-marker *ngFor="let update of updates$" [latitude]="update.lat" [longitude]="update.lon"></agm-marker>
+        <agm-polyline *ngFor="let update of updates$" [strokeColor]="'red'">
+          <agm-polyline-point [latitude]="update.lat" [longitude]="update.lon"></agm-polyline-point>
+          <ng-container *ngIf="updates$[i+1]">
+            <agm-polyline-point [latitude]="updates$[i+1].lat" [longitude]="updates$[i+1].lon"></agm-polyline-point>
+          </ng-container>
+        </agm-polyline>
+      </agm-map>
+    </div>
+    <div class="col-md-2">
+      <h1>Statistics</h1>
+    </div>
   </div>
 </div>
+

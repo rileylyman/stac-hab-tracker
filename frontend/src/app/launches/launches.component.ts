@@ -20,7 +20,22 @@ export class LaunchesComponent implements OnInit {
 
   ngOnInit() {
     this.data.getUpdates(this.trip$).subscribe(
-      data => this.updates$ = data
+      data => 
+      {
+        for (let i = 0; i < data.length; i++) {
+
+          var d  = Math.floor (data[i].lon / 100.0);
+          var m  = (data[i].lon-(d*100));
+          
+          data[i].lon = -(d + m/60.0);
+
+          d  = Math.floor (data[i].lat / 100.0);
+          m  = (data[i].lat-(d*100));
+
+          data[i].lat = d + m/60.0;
+        }
+        this.updates$ = data;
+      }
     );
   }
 
